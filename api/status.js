@@ -9,9 +9,43 @@ export default async function handler(req, res) {
     });
     const data = await response.json();
     
-    // Normalize: Kie.ai uses "state" but our frontend expects "status"
-    if (data?.data?.state && !data?.data?.status) {
-      data.data.status = data.data.state;
+    if (data?.data) {
+      // Normalize state -> status
+      if (data.data.state && !data.data.status) {
+        data.data.status = data.data.state;
+      }
+      
+      // Extract image URL from various possible locations
+      let imageUrl = null;
+      const d = data.data;
+      
+      if (d.output && typeof d.output === "string") {
+        imageUrl = d.output;
+      } else if (d.output?.image_url) {
+        imageUrl = d.output.image_url;
+      } else if (d.output?.url) {
+        imageUrl = d.output.url;
+      } else if (d.output?.images?.[0]) {
+        imageUrl = d.output.images[0];
+      } else if (d.images?.[0]) {
+        imageUrl = d.images[0];
+      } else if (d.resultUrl) {
+        imageUrl = d.resultUrl;
+      } else if (d.result?.images?.[0]) {
+        imageUrl = d.result.images[0];
+      } else if (d.result?.url) {
+        imageUrl = d.result.url;
+      }
+      
+      // If image is base64, convert to data URI
+      if (imageUrl && !imageUrl.startsWith("http") && !imageUrl.startsWith("data:")) {
+        imageUrl = "data:image/png;base64," + imageUrl;
+      }
+      
+      // Set normalized output
+      if (imageUrl) {
+        data.data.output = { image_url: imageUrl };
+      }
     }
     
     res.status(200).json(data);
