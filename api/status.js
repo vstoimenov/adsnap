@@ -8,6 +8,12 @@ export default async function handler(req, res) {
       headers: { Authorization: `Bearer ${API_KEY}` },
     });
     const data = await response.json();
+    
+    // Normalize: Kie.ai uses "state" but our frontend expects "status"
+    if (data?.data?.state && !data?.data?.status) {
+      data.data.status = data.data.state;
+    }
+    
     res.status(200).json(data);
   } catch (e) {
     res.status(500).json({ error: "Failed to check status", details: e.message });
