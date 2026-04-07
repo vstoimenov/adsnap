@@ -15,7 +15,7 @@ export default async function handler(req, res) {
       
       let imageUrl = null;
       
-      // Check all possible locations
+      // Check all possible locations where Kie.ai puts the image
       if (d.param?.images?.[0]) imageUrl = d.param.images[0];
       else if (d.output?.images?.[0]) imageUrl = d.output.images[0];
       else if (d.output?.image_url) imageUrl = d.output.image_url;
