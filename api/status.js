@@ -7,35 +7,48 @@ export default async function handler(req, res) {
     const response = await fetch(`https://api.kie.ai/api/v1/jobs/recordInfo?taskId=${taskId}`, {
       headers: { Authorization: `Bearer ${API_KEY}` },
     });
-    const data = await response.json();
+    const raw = await response.text();
+    
+    // Parse but handle huge responses
+    let data;
+    try { data = JSON.parse(raw); } catch { 
+      return res.status(500).json({ error: "Parse error" }); 
+    }
     
     if (data?.data) {
       const d = data.data;
-      if (d.state && !d.status) d.status = d.state;
+      const status = d.state || d.status || "pending";
       
       let imageUrl = null;
       
-      // Check all possible locations where Kie.ai puts the image
-      if (d.param?.images?.[0]) imageUrl = d.param.images[0];
-      else if (d.output?.images?.[0]) imageUrl = d.output.images[0];
-      else if (d.output?.image_url) imageUrl = d.output.image_url;
-      else if (d.output?.url) imageUrl = d.output.url;
-      else if (d.images?.[0]) imageUrl = d.images[0];
-      else if (d.result?.images?.[0]) imageUrl = d.result.images[0];
-      else if (d.resultUrl) imageUrl = d.resultUrl;
-      else if (typeof d.output === "string") imageUrl = d.output;
-      
-      // Convert base64 to data URI if needed
-      if (imageUrl && !imageUrl.startsWith("http") && !imageUrl.startsWith("data:")) {
-        imageUrl = "data:image/png;base64," + imageUrl;
+      // Look for HTTP URLs first (preferred - small response)
+      const urlPattern = /https?:\/\/[^\s"',\]})]+\.(png|jpg|jpeg|webp)/gi;
+      const urls = raw.match(urlPattern);
+      if (urls && urls.length > 0) {
+        imageUrl = urls[urls.length - 1];
       }
       
-      if (imageUrl) {
-        data.data.output = { image_url: imageUrl };
+      // If no URL found but has base64 images, create a data URI
+      if (!imageUrl && status === "success") {
+        if (d.param?.images?.[0]) {
+          const b64 = d.param.images[0];
+          if (b64.length < 5000000) {
+            imageUrl = "data:image/png;base64," + b64;
+          }
+        }
       }
+      
+      // Return minimal response
+      return res.status(200).json({
+        code: 200,
+        data: {
+          status: status,
+          output: imageUrl ? { image_url: imageUrl } : null
+        }
+      });
     }
     
-    res.status(200).json(data);
+    res.status(200).json({ code: data.code, data: { status: "pending" } });
   } catch (e) {
     res.status(500).json({ error: "Failed", details: e.message });
   }
