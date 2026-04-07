@@ -10,39 +10,26 @@ export default async function handler(req, res) {
     const data = await response.json();
     
     if (data?.data) {
-      // Normalize state -> status
-      if (data.data.state && !data.data.status) {
-        data.data.status = data.data.state;
-      }
-      
-      // Extract image URL from various possible locations
-      let imageUrl = null;
       const d = data.data;
+      if (d.state && !d.status) d.status = d.state;
       
-      if (d.output && typeof d.output === "string") {
-        imageUrl = d.output;
-      } else if (d.output?.image_url) {
-        imageUrl = d.output.image_url;
-      } else if (d.output?.url) {
-        imageUrl = d.output.url;
-      } else if (d.output?.images?.[0]) {
-        imageUrl = d.output.images[0];
-      } else if (d.images?.[0]) {
-        imageUrl = d.images[0];
-      } else if (d.resultUrl) {
-        imageUrl = d.resultUrl;
-      } else if (d.result?.images?.[0]) {
-        imageUrl = d.result.images[0];
-      } else if (d.result?.url) {
-        imageUrl = d.result.url;
-      }
+      let imageUrl = null;
       
-      // If image is base64, convert to data URI
+      // Check all possible locations
+      if (d.param?.images?.[0]) imageUrl = d.param.images[0];
+      else if (d.output?.images?.[0]) imageUrl = d.output.images[0];
+      else if (d.output?.image_url) imageUrl = d.output.image_url;
+      else if (d.output?.url) imageUrl = d.output.url;
+      else if (d.images?.[0]) imageUrl = d.images[0];
+      else if (d.result?.images?.[0]) imageUrl = d.result.images[0];
+      else if (d.resultUrl) imageUrl = d.resultUrl;
+      else if (typeof d.output === "string") imageUrl = d.output;
+      
+      // Convert base64 to data URI if needed
       if (imageUrl && !imageUrl.startsWith("http") && !imageUrl.startsWith("data:")) {
         imageUrl = "data:image/png;base64," + imageUrl;
       }
       
-      // Set normalized output
       if (imageUrl) {
         data.data.output = { image_url: imageUrl };
       }
@@ -50,6 +37,6 @@ export default async function handler(req, res) {
     
     res.status(200).json(data);
   } catch (e) {
-    res.status(500).json({ error: "Failed to check status", details: e.message });
+    res.status(500).json({ error: "Failed", details: e.message });
   }
 }
