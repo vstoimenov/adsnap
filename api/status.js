@@ -4,12 +4,19 @@ export default async function handler(req, res) {
   const { taskId } = req.query;
   if (!taskId) return res.status(400).json({ error: "No taskId" });
   try {
+    const controller = new AbortController();
     const r = await fetch(
       "https://api.kie.ai/api/v1/jobs/recordInfo?taskId=" + taskId,
-      { headers: { Authorization: "Bearer " + API_KEY } }
+      { 
+        headers: { Authorization: "Bearer " + API_KEY },
+        signal: controller.signal
+      }
     );
-    const txt = await r.text();
-    const stateM = txt.match(/"state"\s*:\s*"(\w+)"/);
+    const reader = r.body.getReader();
+    const { value } = await reader.read();
+    controller.abort();
+    const snippet = new TextDecoder().decode(value);
+    const stateM = snippet.match(/"state"\s*:\s*"(\w+)"/);
     const state = stateM ? stateM[1] : "pending";
     let img = null;
     if (state === "success") {
@@ -20,6 +27,6 @@ export default async function handler(req, res) {
       data: { status: state, output: img ? { image_url: img } : null }
     });
   } catch (e) {
-    res.status(200).json({ code: 200, data: { status: "error_" + e.message } });
+    res.status(200).json({ code: 200, data: { status: "pending" } });
   }
 }
